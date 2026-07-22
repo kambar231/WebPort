@@ -55,6 +55,12 @@ nav .links a:hover{opacity:1}
   animation:ken 16s var(--ease) both}
 @keyframes ken{from{transform:scale(1.09)}to{transform:scale(1)}}
 .hero .copy{position:absolute;left:0;right:0;top:14vh;text-align:center;z-index:2;padding:0 20px}
+/* soft light halo behind the copy — the band's dark strap can crop up
+   under the text on tall windows; this keeps it readable on any crop */
+.hero .copy::before{content:'';position:absolute;left:50%;top:50%;z-index:-1;
+  width:min(88vw,860px);height:150%;transform:translate(-50%,-50%);
+  background:radial-gradient(closest-side,rgba(243,239,232,.9),rgba(243,239,232,.55) 55%,rgba(243,239,232,0));
+  filter:blur(8px);pointer-events:none}
 .hero h1{margin:0;font:500 clamp(2.6rem,5.6vw,4.9rem)/1.08 var(--sans);letter-spacing:-.02em}
 .hero h1 em{font-style:italic;font-weight:400}
 .hero .sub{max-width:430px;margin:18px auto 0;color:var(--ink);opacity:.72;font-size:16.5px}

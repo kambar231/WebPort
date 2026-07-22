@@ -99,6 +99,14 @@ a.projlink{text-decoration:none;color:inherit;display:block}
 
 /* live card effects */
 .proj .shot{position:relative}
+.numeraShot{position:relative;aspect-ratio:3/2;background:#faf7f0;overflow:hidden}
+.numeraShot .nh{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font:500 clamp(1.2rem,2.6vw,2rem)/1.2 var(--serif);color:#17150f;text-align:center;white-space:nowrap}
+.numeraShot .nb{position:absolute;padding:7px 13px;border-radius:999px;
+  font:500 11px/1 var(--sans);color:#17150f;box-shadow:0 6px 18px rgba(23,21,15,.08)}
+.numeraShot iframe{position:absolute;left:0;top:0;width:1280px;height:853.34px;border:0;
+  transform-origin:0 0;opacity:0;transition:opacity .9s var(--ease);pointer-events:none}
+.numeraShot iframe.on{opacity:1}
 .cardfx{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .5s var(--ease)}
 .cardfx.on{opacity:1}
 #pzCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -239,12 +247,32 @@ body.pastload #alti{opacity:1}
     </div>
   </div></a>
 
+  <a class="projlink" href="nominal-clone/index.html">
+  <div class="proj">
+    <div class="shot"><div class="numeraShot" aria-hidden="true">
+      <span class="nb" style="top:16%;left:8%;background:#ffe9f2">Intercompany</span>
+      <span class="nb" style="top:24%;right:7%;background:#e6f6ec">Reconciliation</span>
+      <span class="nb" style="bottom:20%;left:12%;background:#fff6d9">Matching</span>
+      <span class="nb" style="bottom:14%;right:10%;background:#ece9fb">Journal Entry</span>
+      <span class="nh">Run your entire close<br>with AI&nbsp;agents.</span>
+    </div>
+      <div class="hint" id="numHint">scroll — run the close</div></div>
+    <div class="meta">
+      <div class="k">Concept 02 · SaaS</div>
+      <h2>NUMERA <em>the close, cloned</em></h2>
+      <p>A faithful rebuild of an AI-accounting landing page: floating agent
+      badges, scroll choreography, and a token-driven design system.</p>
+      <div class="tags"><span>design tokens</span><span>scroll choreography</span><span>site clone</span></div>
+      <span class="open">See the platform</span>
+    </div>
+  </div></a>
+
   <a class="projlink" href="biavola.html">
   <div class="proj">
     <div class="shot"><img data-name="biavola" alt="BIAVOLA, wood-fired pizza">
       <canvas id="pzCv"></canvas></div>
     <div class="meta">
-      <div class="k">Concept 02 · Restaurant</div>
+      <div class="k">Concept 03 · Restaurant</div>
       <h2>BIAVOLA <em>the fire</em></h2>
       <p>A wood-fired menu where hovering a pizza feeds the stage, and the
       oven's fire breathes out of the page's own darkness.</p>
@@ -258,7 +286,7 @@ body.pastload #alti{opacity:1}
     <div class="shot"><img data-name="onda" alt="ONDA, a day with the band">
       </div>
     <div class="meta">
-      <div class="k">Concept 03 · Wearable</div>
+      <div class="k">Concept 04 · Wearable</div>
       <h2>ONDA <em>a day in data</em></h2>
       <p>A fitness band told through one day. The page's light passes from
       dawn to night, and sleep ends as a moon filling to your score.</p>
@@ -377,10 +405,48 @@ function closeSite(){
   siteOv.classList.remove('open','ready');vel=0;
   const f=siteFrame;siteFrame=null;
   if(f)setTimeout(()=>f.remove(),480)}
+/* NUMERA: the card holds the site's dark block-flight sequence in a scaled
+   iframe (the site's ?scrub=1 mode) — driven by YOUR scroll, not autoplay.
+   Like the stone, it asks once: the page pauses on the card and your wheel
+   scrubs the sequence; when the blocks have landed and flown, you're free. */
+const TOUCH=matchMedia('(hover: none)').matches;
+let numDone=false;try{numDone=sessionStorage.getItem('pfGateNum')==='1'}catch(_){}
+let numFr=null,numLock=false,numReady=false,numP=0,numPT=0;
+(function(){
+  const shot=document.querySelector('.numeraShot');if(!shot||REDUCED)return;
+  if(!TOUCH&&numDone)return;
+  const fit=()=>{if(numFr)numFr.style.transform=`scale(${shot.clientWidth/1280})`};
+  const io=new IntersectionObserver(es=>{es.forEach(e=>{
+    if(!e.isIntersecting||numFr)return;
+    io.disconnect();
+    numFr=document.createElement('iframe');
+    /* touch has no wheel to scrub with — it gets the self-playing loop */
+    numFr.src=TOUCH?'nominal-clone/index.html?demo=1':'nominal-clone/index.html?scrub=1';
+    numFr.setAttribute('tabindex','-1');numFr.setAttribute('aria-hidden','true');
+    numFr.addEventListener('load',()=>{numReady=true;
+      if(TOUCH)setTimeout(()=>numFr.classList.add('on'),900)});
+    fit();shot.appendChild(numFr);
+  })},{rootMargin:'600px'});
+  io.observe(shot);
+  addEventListener('resize',fit);
+})();
+function numGateCheck(){
+  if(numDone||numLock||gateLock||REDUCED||TOUCH||!numReady)return;
+  const shot=document.querySelector('.numeraShot');
+  const r=shot.getBoundingClientRect();
+  if(r.top<innerHeight*.62&&r.bottom>innerHeight*.38){
+    numLock=true;vel=0;
+    tgt=Math.max(0,Math.min(maxS(),r.top+scrollY-(innerHeight-r.height)/2));
+    numFr.classList.add('on');
+    document.getElementById('numHint').classList.add('on');
+  }
+}
+
 document.querySelectorAll('a.projlink').forEach(a=>a.addEventListener('click',e=>{
   e.preventDefault();openSite(a.getAttribute('href'))}));
 addEventListener('message',e=>{
   if(!e.data)return;
+  if(!siteFrame||e.source!==siteFrame.contentWindow)return; /* ignore the card demo iframe */
   if(e.data.type==='pf-close')closeSite();
   if(e.data.type==='pf-ready')siteOv.classList.add('ready')});
 addEventListener('keydown',e=>{if(e.key==='Escape'&&siteFrame)closeSite()});
@@ -388,6 +454,9 @@ if(!REDUCED){
   addEventListener('wheel',e=>{e.preventDefault();
     if(gateLock)return;                     /* the stone asks for a moment */
     const d=e.deltaY*(e.deltaMode===1?16:1);
+    if(numLock){                            /* your scroll runs the close */
+      numPT=Math.max(0,Math.min(1,numPT+d*.0001));   /* target only — the loop glides to it */
+      return}
     vel=Math.max(-140,Math.min(140,vel+d*.1))},{passive:false});
   addEventListener('scroll',()=>{if(Math.abs(scrollY-cur)>60){cur=tgt=scrollY}},{passive:true});
   document.querySelectorAll('nav a[href^="#"]').forEach(a=>a.addEventListener('click',e=>{
@@ -396,7 +465,14 @@ if(!REDUCED){
     e.preventDefault();tgt=Math.min(maxS(),el.getBoundingClientRect().top+scrollY-40)}));
   (function smooth(){
     if(Math.abs(vel)>.04){tgt=Math.max(0,Math.min(maxS(),tgt+vel));vel*=.9}else vel=0;
-    gateCheck();
+    gateCheck();numGateCheck();
+    if(numLock){                 /* glide the sequence toward the wheel target */
+      numP+=(numPT-numP)*.075;
+      if(numFr)numFr.contentWindow.postMessage({type:'pf-scrub',p:numP},'*');
+      if(numPT>=1&&numP>.996){numDone=true;numLock=false;
+        numFr.contentWindow.postMessage({type:'pf-scrub',p:1},'*');
+        document.getElementById('numHint').classList.remove('on');
+        try{sessionStorage.setItem('pfGateNum','1')}catch(_){}}}
     cur+=(tgt-cur)*.085;
     if(Math.abs(cur-scrollY)>.4)scrollTo(0,cur);
     scrollS=scrollY;
@@ -536,7 +612,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape')sheet.classList.remove('open'
 /* TERRA gate: the first time the card arrives, the page holds still until
    you've actually played with the reveal for two seconds */
 function gateCheck(){
-  if(gateDone||gateLock||REDUCED)return;
+  if(gateDone||gateLock||REDUCED||TOUCH)return;   /* no cursor to ask for */
   const shot=document.getElementById('terraFx').parentElement;
   const r=shot.getBoundingClientRect();
   if(r.top<innerHeight*.62&&r.bottom>innerHeight*.38){
