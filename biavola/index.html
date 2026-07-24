@@ -10,7 +10,7 @@
 <meta property="og:description" content="BIAVOLA — an interactive concept site for a wood-fired pizzeria, where choosing each pizza feeds a live wood-fired stage.">
 <meta property="og:type" content="website">
 <!-- og:image path is relative to the site root; make it an absolute https URL when deploying to a domain -->
-<meta property="og:image" content="assets/bia-ovenfire.webp">
+<meta property="og:image" content="https://kambar231.github.io/WebPort/assets/img/biavola/ovenfire.webp">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="BIAVOLA — wood-fired pizza (demo)">
 <meta name="twitter:description" content="BIAVOLA — an interactive concept site for a wood-fired pizzeria, where choosing each pizza feeds a live wood-fired stage.">
@@ -256,8 +256,8 @@ footer small{width:100%;color:#5e564c;font-size:12px}
 
 <script>
 /* ---------- embedded cast ---------- */
-const IMG={ovenfire:"assets/bia-ovenfire.webp",margherita:"assets/bia-margherita.webp",diavola:"data:image/jpeg;base64,__BIAVOLA__",
-  funghi:"assets/bia-funghi.webp",nduja:"assets/bia-nduja.webp"};
+const IMG={ovenfire:"../assets/img/biavola/ovenfire.webp",margherita:"../assets/img/biavola/margherita.webp",diavola:"data:image/jpeg;base64,__BIAVOLA__",
+  funghi:"../assets/img/biavola/funghi.webp",nduja:"../assets/img/biavola/nduja.webp"};
 document.querySelectorAll('img[data-name]').forEach(el=>{
   el.addEventListener('error',()=>{el.dataset.failed='1';el.classList.remove('on')});
   const v=IMG[el.dataset.name];

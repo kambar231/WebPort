@@ -10,7 +10,7 @@
 <meta property="og:description" content="ONDA — a fitness-band concept site told through a scenario scroll that walks you through a full day with the device.">
 <meta property="og:type" content="website">
 <!-- og:image path is relative to the site root; make it an absolute https URL when deploying to a domain -->
-<meta property="og:image" content="assets/onda-herostone.webp">
+<meta property="og:image" content="https://kambar231.github.io/WebPort/assets/img/onda-day/herostone.webp">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="ONDA — a day with the band (demo)">
 <meta name="twitter:description" content="ONDA — a fitness-band concept site told through a scenario scroll that walks you through a full day with the device.">
@@ -343,8 +343,8 @@ footer small{width:100%;color:#a39a8c;font-size:12.5px}
 </footer>
 
 <script>
-const IMG={herostone:"assets/onda-herostone.webp",wake:"assets/onda-wake.webp",walk:"assets/onda-walk.webp",
-  wind:"assets/onda-wind.webp",night:"assets/onda-night.webp",trio:"assets/onda-trio.webp"};
+const IMG={herostone:"../assets/img/onda-day/herostone.webp",wake:"../assets/img/onda-day/wake.webp",walk:"../assets/img/onda-day/walk.webp",
+  wind:"../assets/img/onda-day/wind.webp",night:"../assets/img/onda-day/night.webp",trio:"../assets/img/onda-day/trio.webp"};
 document.querySelectorAll('img[data-name]').forEach(el=>{
   el.src=IMG[el.dataset.name]});
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;

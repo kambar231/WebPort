@@ -9,8 +9,7 @@
 <meta property="og:title" content="Kambar — websites, effects, fast iteration">
 <meta property="og:description" content="Portfolio of Kambar — interactive websites, custom effects, and fast iteration, with live in-page demos of the TERRA, BIAVOLA, and ONDA concept sites.">
 <meta property="og:type" content="website">
-<!-- og:image path is relative to the site root; make it an absolute https URL when deploying to a domain -->
-<meta property="og:image" content="assets/idx-frieze.webp">
+<meta property="og:image" content="https://kambar231.github.io/WebPort/assets/img/home/frieze.webp">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Kambar — websites, effects, fast iteration">
 <meta name="twitter:description" content="Portfolio of Kambar — interactive websites, custom effects, and fast iteration, with live in-page demos of the TERRA, BIAVOLA, and ONDA concept sites.">
@@ -249,7 +248,7 @@ body.pastload #alti{opacity:1}
 
 <section class="projects wrap" id="work">
 
-  <a class="projlink" href="terra-museum.html">
+  <a class="projlink" href="terra-museum/">
   <div class="proj">
     <div class="shot"><img loading="lazy" decoding="async" data-name="terra" alt="TERRA, Museum of Living Stone">
       <canvas class="cardfx" id="terraFx"></canvas>
@@ -264,7 +263,7 @@ body.pastload #alti{opacity:1}
     </div>
   </div></a>
 
-  <a class="projlink" href="nominal-clone/index.html">
+  <a class="projlink" href="numera/">
   <div class="proj">
     <div class="shot"><div class="numeraShot" aria-hidden="true">
       <span class="nb" style="top:16%;left:8%;background:#ffe9f2">Intercompany</span>
@@ -284,7 +283,7 @@ body.pastload #alti{opacity:1}
     </div>
   </div></a>
 
-  <a class="projlink" href="biavola.html">
+  <a class="projlink" href="biavola/">
   <div class="proj">
     <div class="shot"><img loading="lazy" decoding="async" data-name="biavola" alt="BIAVOLA, wood-fired pizza">
       <canvas id="pzCv"></canvas></div>
@@ -298,7 +297,7 @@ body.pastload #alti{opacity:1}
     </div>
   </div></a>
 
-  <a class="projlink" href="onda-day.html">
+  <a class="projlink" href="onda-day/">
   <div class="proj">
     <div class="shot"><img loading="lazy" decoding="async" data-name="onda" alt="ONDA, a day with the band">
       </div>
@@ -333,8 +332,8 @@ body.pastload #alti{opacity:1}
 </div>
 
 <script>
-const IMG={terra:"assets/idx-terra.webp",biavola:"assets/idx-biavola.webp",onda:"assets/idx-onda.webp",
-  frieze:"assets/idx-frieze.webp",marg:"assets/idx-marg.webp"};
+const IMG={terra:"assets/img/home/terra.webp",biavola:"assets/img/home/biavola.webp",onda:"assets/img/home/onda.webp",
+  frieze:"assets/img/home/frieze.webp",marg:"assets/img/home/marg.webp"};
 document.querySelectorAll('img[data-name]').forEach(el=>{
   el.src=IMG[el.dataset.name]});
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -438,7 +437,7 @@ let numFr=null,numLock=false,numReady=false,numP=0,numPT=0;
     io.disconnect();
     numFr=document.createElement('iframe');
     /* touch has no wheel to scrub with — it gets the self-playing loop */
-    numFr.src=TOUCH?'nominal-clone/index.html?demo=1':'nominal-clone/index.html?scrub=1';
+    numFr.src=TOUCH?'numera/index.html?demo=1':'numera/index.html?scrub=1';
     numFr.setAttribute('tabindex','-1');numFr.setAttribute('aria-hidden','true');
     numFr.addEventListener('load',()=>{numReady=true;
       if(TOUCH)setTimeout(()=>numFr.classList.add('on'),900)});

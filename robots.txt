@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kambar231.github.io/WebPort/sitemap.xml
