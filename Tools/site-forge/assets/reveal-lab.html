@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reveal Lab — content-aware paint-on-water</title>
+<style>
+:root{--bg:#eae6de;--ink:#1c1712;--dim:#6f675c;--accent:#a3672f;
+  --sans:'Archivo',system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 14px/1.5 var(--sans);overflow:hidden}
+#gl{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+.hint{position:fixed;left:28px;bottom:24px;z-index:3;color:var(--dim);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+h1{position:fixed;left:28px;top:20px;z-index:3;font:500 15px var(--sans);letter-spacing:.3em;margin:0}
+/* panel */
+#panel{position:fixed;right:16px;top:16px;z-index:4;width:264px;background:rgba(255,253,248,.92);
+  border:1px solid #d6cfc2;border-radius:4px;padding:14px 16px;backdrop-filter:blur(6px);
+  max-height:calc(100vh - 32px);overflow:auto}
+#panel h2{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.row label{flex:0 0 108px;font-size:12px;color:#4a443c}
+.row input[type=range]{flex:1;accent-color:#a3672f;height:20px}
+.row output{flex:0 0 34px;text-align:right;font-size:11px;color:var(--dim)}
+.row select{flex:1;font:inherit;font-size:12px;padding:2px}
+.btns{display:flex;gap:8px;margin-top:12px}
+button{font:500 12px var(--sans);letter-spacing:.06em;padding:7px 10px;border:1px solid #c9c0b0;
+  background:#f6f2ea;color:var(--ink);border-radius:3px;cursor:pointer}
+button:hover{background:#efe9dd}
+.chk{display:flex;gap:8px;align-items:center;font-size:12px;color:#4a443c;margin:7px 0}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1c1712;color:#f0eadf;
+  font-size:12px;letter-spacing:.08em;padding:8px 14px;border-radius:3px;opacity:0;transition:opacity .3s;z-index:5}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<h1>REVEAL LAB</h1>
+<div class="hint">Move the cursor — ink follows the carving</div>
+<div id="panel">
+  <h2>Brush</h2>
+  <div class="row"><label>Size</label><input type="range" id="brushR" min=".04" max=".3" step=".005" value=".075"><output></output></div>
+  <div class="row"><label>Morph</label><input type="range" id="morph" min="0" max=".5" step=".01" value=".15"><output></output></div>
+  <div class="row"><label>Deposit</label><input type="range" id="deposit" min=".1" max="1.5" step=".05" value="1"><output></output></div>
+  <h2 style="margin-top:14px">Water</h2>
+  <div class="row"><label>Persistence</label><input type="range" id="decay" min=".95" max=".999" step=".001" value=".982"><output></output></div>
+  <div class="row"><label>Dispersal</label><input type="range" id="diffuse" min="0" max="2.5" step=".05" value=".7"><output></output></div>
+  <h2 style="margin-top:14px">The carving pulls the ink</h2>
+  <div class="row"><label>Flow along</label><input type="range" id="imgSpeed" min="0" max="2.5" step=".05" value=".5"><output></output></div>
+  <div class="row"><label>Ridge climb</label><input type="range" id="climb" min="0" max="1" step=".05" value=".5"><output></output></div>
+  <div class="row"><label>Stroke gust</label><input type="range" id="gust" min="0" max="2" step=".05" value=".7"><output></output></div>
+  <h2 style="margin-top:14px">Look</h2>
+  <div class="row"><label>Head edge</label><input type="range" id="headEdge" min=".01" max=".2" step=".005" value=".075"><output></output></div>
+  <div class="row"><label>Wake reveal</label><input type="range" id="wake" min=".2" max="1" step=".05" value=".7"><output></output></div>
+  <div class="row"><label>Wet rim</label><input type="range" id="rim" min="0" max="1" step=".05" value=".25"><output></output></div>
+  <div class="row"><label>Background</label><select id="bgSel">
+    <option value="dendrite" selected>Dendrite (tree veins)</option>
+    <option value="dunes">Dunes</option>
+    <option value="marble">Marble folds</option>
+    <option value="custom">Custom image…</option></select></div>
+  <input type="file" id="bgFile" accept="image/*" style="display:none">
+  <div class="chk" style="color:#8d8477;font-size:11px">or drag &amp; drop any relief image
+    onto the page — its forms become the flow field</div>
+  <div class="chk"><input type="checkbox" id="phantoms" checked><label for="phantoms">Phantom visitors</label></div>
+  <div class="chk"><input type="checkbox" id="showFlow"><label for="showFlow">Show flow field</label></div>
+  <div class="btns"><button id="copyBtn">Copy settings</button><button id="clearBtn">Clear ink</button></div>
+</div>
+<div id="toast">settings copied</div>
+
+<script>
+/* ============================================================
+   REVEAL LAB — content-aware paint-on-water
+   deposit → advect along image-derived flow → disperse → decay
+   ============================================================ */
+const P={}; // live params, bound to sliders
+document.querySelectorAll('#panel input[type=range]').forEach(el=>{
+  P[el.id]=+el.value;el.nextElementSibling.value=el.value;
+  el.addEventListener('input',()=>{P[el.id]=+el.value;el.nextElementSibling.value=el.value;
+    if(el.id==='climb')rebuildFlow()});
+});
+P.phantoms=true;P.showFlow=false;
+document.getElementById('phantoms').onchange=e=>P.phantoms=e.target.checked;
+document.getElementById('showFlow').onchange=e=>P.showFlow=e.target.checked;
+
+/* ---------- procedural relief (the guiding image) ---------- */
+function noiseGen(seed){let s=seed>>>0;return()=>((s=Math.imul(s^s>>>15,s|1),s^=s+Math.imul(s^s>>>7,s|61),(s^s>>>14)>>>0)/4294967296)}
+function fbmFactory(seed){
+  const rnd=noiseGen(seed),G=48,g=[];
+  for(let j=0;j<=G;j++){g[j]=[];for(let i=0;i<=G;i++)g[j][i]=rnd()}
+  const val=(x,y)=>{const gx=x*G,gy=y*G,fi=Math.floor(gx),fj=Math.floor(gy),fx=gx-fi,fy=gy-fj,
+    i=((fi%G)+G)%G,j=((fj%G)+G)%G,i2=(i+1)%G,j2=(j+1)%G,
+    sm=t=>t*t*(3-2*t),u=sm(fx),v=sm(fy);
+    return g[j][i]*(1-u)*(1-v)+g[j][i2]*u*(1-v)+g[j2][i]*(1-u)*v+g[j2][i2]*u*v};
+  return (x,y,oct)=>{let f=0,amp=.55,fr=1;
+    for(let o=0;o<oct;o++){f+=amp*val(x*fr,y*fr);amp*=.5;fr*=2.13}return f};
+}
+const HW=560,HH=350;                       // heightfield res (also flow res)
+let HT=new Float32Array(HW*HH);
+function buildHeight(kind){
+  const fbm=fbmFactory(kind==='dendrite'?31:kind==='dunes'?7:77);
+  for(let y=0;y<HH;y++)for(let x=0;x<HW;x++){
+    const nx=x/HW*.13,ny=y/HH*.13;
+    const q=fbm(nx,ny,2);
+    const r=fbm(nx+.09*q+1.7,ny+.08*q+4.6,2);
+    let v;
+    if(kind==='dendrite'){          // branching vein network: strong ridged field
+      const rg=1-Math.abs(2*fbm(nx*1.6+.11*r,ny*1.6+.09*r,3)-1);
+      v=.25*fbm(nx,ny,3)+.75*Math.pow(rg,2.2);
+    }else if(kind==='dunes'){
+      const rg=1-Math.abs(2*fbm(nx*1.3+7,ny*1.3+3,2)-1);
+      v=.6*fbm(nx+.12*r,ny+.1*r,3)+.4*rg*rg;
+    }else{                          // marble: pure warped folds
+      v=fbm(nx+.14*r,ny+.12*r,4);
+    }
+    HT[y*HW+x]=Math.min(1,Math.max(0,(v-.3)*1.7));
+  }
+  for(let pass=0;pass<2;pass++){    // polish
+    const tmp=new Float32Array(HT);
+    for(let y=0;y<HH;y++)for(let x=0;x<HW;x++){
+      let s=0,n=0;
+      for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=HH)continue;
+        for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=HW)continue;
+          s+=tmp[yy*HW+xx];n++}}
+      HT[y*HW+x]=s/n;}
+  }
+}
+function shadeStone(){                      // relief image texture (RGB canvas)
+  const c=document.createElement('canvas');c.width=HW;c.height=HH;
+  const ctx=c.getContext('2d'),img=ctx.createImageData(HW,HH);
+  const L=[-.58,-.62,.53],ln=Math.hypot(...L);L[0]/=ln;L[1]/=ln;L[2]/=ln;
+  for(let y=0;y<HH;y++)for(let x=0;x<HW;x++){
+    const i=y*HW+x,
+    hl=HT[y*HW+Math.max(x-1,0)],hr=HT[y*HW+Math.min(x+1,HW-1)],
+    hu=HT[Math.max(y-1,0)*HW+x],hd=HT[Math.min(y+1,HH-1)*HW+x];
+    let nx=(hl-hr)*26,ny2=(hu-hd)*26,nz=1;
+    const nl=Math.hypot(nx,ny2,nz);nx/=nl;ny2/=nl;nz/=nl;
+    const diff=Math.max(0,nx*L[0]+ny2*L[1]+nz*L[2]);
+    const spec=Math.pow(diff,14)*.14,cav=.86+.14*HT[i];
+    let s=(.56+.5*diff)*cav+spec;s=Math.min(1.05,Math.max(.5,s));
+    const k=i*4;
+    img.data[k]=Math.min(255,247*s);img.data[k+1]=Math.min(255,243*s);
+    img.data[k+2]=Math.min(255,233*s);img.data[k+3]=255;
+  }
+  ctx.putImageData(img,0,0);return c;
+}
+/* edge-tangent flow (Kang et al.): tangent of the gradient, smoothed, plus a
+   climb term toward ridge crests — this is what makes ink follow the branches */
+let FLOW=new Float32Array(HW*HH*4);
+function rebuildFlow(){
+  const gx=new Float32Array(HW*HH),gy=new Float32Array(HW*HH),mg=new Float32Array(HW*HH);
+  for(let y=0;y<HH;y++)for(let x=0;x<HW;x++){
+    const i=y*HW+x,
+    hl=HT[y*HW+Math.max(x-1,0)],hr=HT[y*HW+Math.min(x+1,HW-1)],
+    hu=HT[Math.max(y-1,0)*HW+x],hd=HT[Math.min(y+1,HH-1)*HW+x];
+    gx[i]=(hr-hl)*.5;gy[i]=(hd-hu)*.5;mg[i]=Math.hypot(gx[i],gy[i]);
+  }
+  let tx=new Float32Array(HW*HH),ty=new Float32Array(HW*HH);
+  for(let i=0;i<HW*HH;i++){tx[i]=-gy[i];ty[i]=gx[i]}   // rotate 90° → along contours
+  for(let pass=0;pass<3;pass++){                       // ETF smoothing, sign-aligned
+    const ntx=new Float32Array(HW*HH),nty=new Float32Array(HW*HH);
+    for(let y=0;y<HH;y++)for(let x=0;x<HW;x++){
+      const i=y*HW+x;let ax=0,ay=0;
+      for(let dy=-2;dy<=2;dy++){const yy=y+dy;if(yy<0||yy>=HH)continue;
+        for(let dx=-2;dx<=2;dx++){const xx=x+dx;if(xx<0||xx>=HW)continue;
+          const j=yy*HW+xx,dot=tx[i]*tx[j]+ty[i]*ty[j],s=dot<0?-1:1,w=mg[j];
+          ax+=tx[j]*s*w;ay+=ty[j]*s*w}}
+      const l=Math.hypot(ax,ay)||1;ntx[i]=ax/l;nty[i]=ay/l;
+    }
+    tx=ntx;ty=nty;
+  }
+  const climb=P.climb;
+  for(let i=0;i<HW*HH;i++){
+    const gl=mg[i]||1e-6,ux=gx[i]/gl,uy=gy[i]/gl;      // uphill: toward the crest
+    let fx=tx[i]*(1-climb)+ux*climb,fy=ty[i]*(1-climb)+uy*climb;
+    const l=Math.hypot(fx,fy)||1;fx/=l;fy/=l;
+    const k=i*4,str=Math.min(1,mg[i]*26);              // flat ground: ink rests
+    FLOW[k]=fx*.5+.5;FLOW[k+1]=fy*.5+.5;FLOW[k+2]=str;FLOW[k+3]=1;
+  }
+  if(gl)uploadFlow();
+}
+
+/* ---------- WebGL2 ping-pong sim ---------- */
+const cvs=document.getElementById('gl');
+const gl=cvs.getContext('webgl2',{antialias:false});
+if(!gl){document.body.innerHTML='<p style="padding:40px">WebGL2 required for the lab.</p>';throw 0}
+gl.getExtension('EXT_color_buffer_float');
+const SIMW=480,SIMH=300;
+function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw gl.getShaderInfoLog(s);return s}
+function prog(v,f){const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,v));
+  gl.attachShader(p,sh(gl.FRAGMENT_SHADER,f));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw gl.getProgramInfoLog(p);return p}
+const VS=`#version 300 es
+in vec2 aP;out vec2 vUv;void main(){vUv=aP*.5+.5;gl_Position=vec4(aP,0,1);}`;
+
+const SIM_FS=`#version 300 es
+precision highp float;in vec2 vUv;out vec4 o;
+uniform sampler2D uInk,uFlow;
+uniform vec2 uTexel;uniform float uDecay,uDiffuse,uImgSpeed,uGust,uDeposit,uMorph,uTime;
+uniform vec4 uSeg[3];      /* xy=prev, zw=cur (uv) */
+uniform vec3 uSegMeta[3];  /* x=radius, y=strength, z=active */
+uniform vec2 uVel[3];      /* pointer velocity (uv/frame) */
+float sdSeg(vec2 p,vec2 a,vec2 b){vec2 pa=p-a,ba=b-a;
+  float h=clamp(dot(pa,ba)/max(dot(ba,ba),1e-6),0.,1.);return length(pa-ba*h);}
+void main(){
+  vec2 ar=vec2(uTexel.y/uTexel.x,1.);            /* aspect-correct space */
+  vec4 F=texture(uFlow,vUv);
+  vec2 flow=(F.rg*2.-1.)*F.b;                    /* image pull, gated by edge strength */
+  vec2 gust=vec2(0.);
+  for(int i=0;i<3;i++){ if(uSegMeta[i].z<.5)continue;
+    float d=sdSeg(vUv*ar,uSeg[i].zw*ar,uSeg[i].zw*ar);
+    gust+=uVel[i]*exp(-d*d/(uSegMeta[i].x*uSegMeta[i].x*4.))*uGust*40.;}
+  vec2 src=clamp(vUv-(flow*uImgSpeed*1.6+gust)*uTexel*60.*.016,vec2(.001),vec2(.999));
+  /* dispersal: widen the backtrace sample — ink spreading through water */
+  vec2 r=uTexel*uDiffuse;
+  float ink=texture(uInk,src).r*.4
+    +(texture(uInk,src+vec2(r.x,0)).r+texture(uInk,src-vec2(r.x,0)).r
+     +texture(uInk,src+vec2(0,r.y)).r+texture(uInk,src-vec2(0,r.y)).r)*.15;
+  ink*=uDecay;
+  /* deposit: capsule stroke with a morphing rim */
+  for(int i=0;i<3;i++){ if(uSegMeta[i].z<.5)continue;
+    vec2 p=vUv*ar,a=uSeg[i].xy*ar,b=uSeg[i].zw*ar;
+    float d=sdSeg(p,a,b);
+    vec2 q=p-b;float th=atan(q.y,q.x);
+    float m=1.+uMorph*(.5*sin(3.*th+uTime*1.7)+.33*sin(5.*th-uTime*2.3)+.22*sin(7.*th+uTime*3.1));
+    float rr=uSegMeta[i].x*m;
+    ink+=uDeposit*uSegMeta[i].y*smoothstep(rr,rr*.45,d);}
+  o=vec4(min(ink,1.6),0.,0.,1.);
+}`;
+
+const DRAW_FS=`#version 300 es
+precision highp float;in vec2 vUv;out vec4 o;
+uniform sampler2D uInk,uStone,uFlow;
+uniform float uHeadEdge,uWake,uRim,uShowFlow;
+const vec3 BG=vec3(.918,.902,.871);
+void main(){
+  float m=texture(uInk,vUv).r;
+  float head=smoothstep(.62-uHeadEdge,.62+uHeadEdge,m);
+  float body=smoothstep(.06,.5,m)*uWake;
+  float rev=max(head,body);
+  vec3 stone=texture(uStone,vUv).rgb;
+  vec3 col=mix(BG,stone,rev);
+  /* wet meniscus rim on the reveal edge */
+  float e=length(vec2(dFdx(m),dFdy(m)));
+  col+=vec3(1.,.98,.92)*e*uRim*smoothstep(.05,.45,m)*(1.-head)*2.2;
+  if(uShowFlow>.5){vec4 F=texture(uFlow,vUv);
+    col=mix(col,vec3(F.r,F.g,1.-F.r*.5),.35*F.b*3.);}
+  o=vec4(col,1.);
+}`;
+
+const quad=gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+function bindQuad(p){const loc=gl.getAttribLocation(p,'aP');
+  gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0)}
+const simP=prog(VS,SIM_FS),drawP=prog(VS,DRAW_FS);
+function tex(w,h,data,fmt){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  if(fmt==='f')gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.FLOAT,data);
+  else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,data);
+  return t}
+let inkA=tex(SIMW,SIMH,null,'f'),inkB=tex(SIMW,SIMH,null,'f');
+const fbo=gl.createFramebuffer();
+let stoneTex,flowTex;
+function uploadFlow(){if(flowTex)gl.deleteTexture(flowTex);
+  flowTex=tex(HW,HH,FLOW,'f')}
+function rebuildAll(){buildHeight(document.getElementById('bgSel').value);
+  if(stoneTex)gl.deleteTexture(stoneTex);stoneTex=tex(0,0,shadeStone());rebuildFlow();clearInk()}
+document.getElementById('bgSel').onchange=e=>{
+  if(e.target.value==='custom')document.getElementById('bgFile').click();
+  else rebuildAll()};
+
+/* ---- custom image: the picture is the sculpture — luminance becomes height ---- */
+function useImage(img){
+  /* full-res visual */
+  const vw=Math.min(img.width,2048),vh=Math.round(vw*img.height/img.width);
+  const vc=document.createElement('canvas');vc.width=vw;vc.height=vh;
+  vc.getContext('2d').drawImage(img,0,0,vw,vh);
+  if(stoneTex)gl.deleteTexture(stoneTex);stoneTex=tex(0,0,vc);
+  /* heightfield from luminance at sim res */
+  const hc=document.createElement('canvas');hc.width=HW;hc.height=HH;
+  const hx=hc.getContext('2d');hx.drawImage(img,0,0,HW,HH);
+  const d=hx.getImageData(0,0,HW,HH).data;
+  for(let i=0;i<HW*HH;i++)
+    HT[i]=(d[i*4]*.299+d[i*4+1]*.587+d[i*4+2]*.114)/255;
+  for(let pass=0;pass<1;pass++){                 // light polish only — keep the figures
+    const tmp=new Float32Array(HT);
+    for(let y=0;y<HH;y++)for(let x=0;x<HW;x++){
+      let s=0,n=0;
+      for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=HH)continue;
+        for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=HW)continue;
+          s+=tmp[yy*HW+xx];n++}}
+      HT[y*HW+x]=s/n;}
+  }
+  rebuildFlow();clearInk();
+  const sel=document.getElementById('bgSel');sel.value='custom';
+}
+document.getElementById('bgFile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const img=new Image();img.onload=()=>useImage(img);img.src=URL.createObjectURL(f)};
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();
+  const f=[...e.dataTransfer.files].find(f=>f.type.startsWith('image/'));if(!f)return;
+  const img=new Image();img.onload=()=>useImage(img);img.src=URL.createObjectURL(f)});
+function clearInk(){[inkA,inkB].forEach(t=>{gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+  gl.viewport(0,0,SIMW,SIMH);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT)})}
+document.getElementById('clearBtn').onclick=clearInk;
+document.getElementById('copyBtn').onclick=()=>{
+  const out={...P};navigator.clipboard?.writeText(JSON.stringify(out,null,2));
+  const t=document.getElementById('toast');t.style.opacity=1;setTimeout(()=>t.style.opacity=0,1400)};
+
+/* ---------- pointers ---------- */
+const DEMO=new URLSearchParams(location.search).has('demo');
+function mkPtr(x,y,str){return{x,y,tx:x,ty:y,px:x,py:y,str}}
+const me=mkPtr(.5,.45,1);
+addEventListener('pointermove',e=>{me.tx=e.clientX/innerWidth;me.ty=1-e.clientY/innerHeight});
+const PR=noiseGen(4242);
+const ph=[mkPtr(.8,.3,.5),mkPtr(.18,.2,.42)];
+ph.forEach(p=>{p.next=0;p.wander=t=>{if(t<p.next)return;
+  if(PR()<.28){p.next=t+1.2+PR()*2.2}
+  else{p.tx=.06+PR()*.88;p.ty=.08+PR()*.84;p.next=t+1.6+PR()*3.4}}});
+function stepPtr(p,l){p.px=p.x;p.py=p.y;p.x+=(p.tx-p.x)*l;p.y+=(p.ty-p.y)*l}
+
+function resize(){cvs.width=innerWidth*Math.min(devicePixelRatio,1.5);
+  cvs.height=innerHeight*Math.min(devicePixelRatio,1.5)}
+resize();addEventListener('resize',resize);
+rebuildAll();
+
+let t0=null;
+function frame(ts){
+  if(t0===null)t0=ts;const t=(ts-t0)/1000;
+  if(DEMO){me.tx=.2+.55*Math.min(t/2.5,1);me.ty=.5+.14*Math.sin(t*2.4)}
+  stepPtr(me,.12);
+  ph.forEach(p=>{p.wander(t);stepPtr(p,.05)});
+  const ptrs=[me,...(P.phantoms?ph:[])];
+  /* sim pass */
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,inkB,0);
+  gl.viewport(0,0,SIMW,SIMH);gl.useProgram(simP);bindQuad(simP);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,inkA);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,flowTex);
+  const U=n=>gl.getUniformLocation(simP,n);
+  gl.uniform1i(U('uInk'),0);gl.uniform1i(U('uFlow'),1);
+  gl.uniform2f(U('uTexel'),1/SIMW,1/SIMH);
+  gl.uniform1f(U('uDecay'),P.decay);gl.uniform1f(U('uDiffuse'),P.diffuse);
+  gl.uniform1f(U('uImgSpeed'),P.imgSpeed);gl.uniform1f(U('uGust'),P.gust);
+  gl.uniform1f(U('uDeposit'),P.deposit);gl.uniform1f(U('uMorph'),P.morph);
+  gl.uniform1f(U('uTime'),t);
+  const seg=[],meta=[],vel=[];
+  for(let i=0;i<3;i++){const p=ptrs[i];
+    if(p){seg.push(p.px,p.py,p.x,p.y);meta.push(P.brushR*(p===me?1:.72),p.str,1);
+      vel.push((p.x-p.px),(p.y-p.py))}
+    else{seg.push(0,0,0,0);meta.push(0,0,0);vel.push(0,0)}}
+  gl.uniform4fv(U('uSeg[0]'),seg);gl.uniform3fv(U('uSegMeta[0]'),meta);
+  gl.uniform2fv(U('uVel[0]'),vel);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  [inkA,inkB]=[inkB,inkA];
+  /* draw pass */
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  gl.viewport(0,0,cvs.width,cvs.height);gl.useProgram(drawP);bindQuad(drawP);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,inkA);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,stoneTex);
+  gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,flowTex);
+  const D=n=>gl.getUniformLocation(drawP,n);
+  gl.uniform1i(D('uInk'),0);gl.uniform1i(D('uStone'),1);gl.uniform1i(D('uFlow'),2);
+  gl.uniform1f(D('uHeadEdge'),P.headEdge);gl.uniform1f(D('uWake'),P.wake);
+  gl.uniform1f(D('uRim'),P.rim);gl.uniform1f(D('uShowFlow'),P.showFlow?1:0);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
