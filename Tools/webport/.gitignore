@@ -1,6 +1,0 @@
-__pycache__/
-*.pyc
-.env
-shots/
-webgen-shots/
-capture_*_reference.png
