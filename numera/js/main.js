@@ -62,6 +62,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // ---- demo modal: outbound links are polite dead ends ----------------
+  // On the real site these would navigate to other pages (login, demo
+  // booking, ERP and blog posts, footer pages); none of that exists in
+  // this recreation. Marked .demo-dead so the glide handler skips them.
+  window.__safe('demoModal', () => {
+    const modal = document.getElementById('demoModal');
+    if (!modal) return;
+    document.querySelectorAll(
+      '.nav-cta-link, .erp-card, .blog-card, .footer-col a, .footer-bottom a, a.btn[href="#cta"], a.btn[href="#nav"]'
+    ).forEach(a => {
+      a.classList.add('demo-dead');
+      a.addEventListener('click', e => { e.preventDefault(); modal.classList.add('open'); });
+    });
+    document.getElementById('demoModalClose').addEventListener('click', () => modal.classList.remove('open'));
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+    addEventListener('keydown', e => { if (e.key === 'Escape') modal.classList.remove('open'); });
+  });
+
   // ---- inertial wheel smoothing (desktop, normal mode only) -----------
   // Mouse wheels are notched; raw detents make the scroll-driven
   // choreography step like a button press. Wheel input feeds a velocity,
@@ -80,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // external jumps (keyboard, scrollbar) resync the loop
     addEventListener('scroll', () => { if (Math.abs(scrollY - cur) > 60) { cur = tgt = scrollY; vel = 0; } }, { passive: true });
     // anchor links ride the same glide instead of jumping
-    document.querySelectorAll('a[href^="#"]').forEach(a => a.addEventListener('click', e => {
+    document.querySelectorAll('a[href^="#"]:not(.demo-dead)').forEach(a => a.addEventListener('click', e => {
       const el = document.querySelector(a.getAttribute('href'));
       if (!el) return;
       e.preventDefault();

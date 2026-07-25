@@ -395,3 +395,34 @@ html.demo { scrollbar-width: none; scroll-behavior: auto; }
 html.demo::-webkit-scrollbar { display: none; }
 html.demo body { pointer-events: none; }
 html.demo .section-nav { display: none; }
+
+/* ---- demo modal: outbound links are polite dead ends ---- */
+#demoModal {
+  position: fixed; inset: 0; z-index: 500;
+  display: none; align-items: center; justify-content: center;
+  background: rgb(14 27 23 / 0.45);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+}
+#demoModal.open { display: flex; }
+#demoModal .demo-card {
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
+  max-width: 400px; margin: var(--space-4); padding: var(--space-8);
+  text-align: center;
+}
+#demoModal h5 {
+  font: 600 var(--text-2xl)/1.2 var(--font-display);
+  color: var(--color-ink); margin: 0 0 var(--space-3);
+}
+#demoModal p {
+  margin: 0; color: var(--color-text-muted);
+  font-size: var(--text-sm); line-height: 1.6;
+}
+#demoModal button {
+  margin-top: var(--space-6); padding: 12px 26px; cursor: pointer;
+  font: 500 var(--text-sm) var(--font-text);
+  background: var(--color-accent); color: var(--color-accent-ink);
+  border: 0; border-radius: var(--radius-pill);
+  transition: filter var(--dur-fast);
+}
+#demoModal button:hover { filter: brightness(0.95); }
